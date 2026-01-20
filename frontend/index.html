@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nai-Balance</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="background-glow"></div>
+    <div class="login-screen hidden" id="loginScreen">
+      <div class="login-card">
+        <div class="login-brand">
+          <div class="brand-mark">NP</div>
+          <div>
+            <div class="brand-title">Nai-Balance</div>
+            <div class="brand-subtitle">请先登录后使用 🔐</div>
+          </div>
+        </div>
+        <div class="muted">本站仅提供 NovelAI API 中转与密钥池管理。</div>
+        <div class="login-actions">
+          <button class="btn primary" id="loginGateBtn">登录 / 注册 ✨</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="app" id="appRoot">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">NP</div>
+          <div>
+            <div class="brand-title">Nai-Balance</div>
+            <div class="brand-subtitle">Shared Key Gateway</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-section="dashboard">概览 📊</button>
+          <button class="nav-item" data-section="keys">中转 Key 🗝️</button>
+          <button class="nav-item" data-section="logs">日志 🧾</button>
+          <button class="nav-item" data-section="admin" id="adminNav">管理 🛠️</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="status-pill" id="authStatus">未登录</div>
+          <button class="btn ghost" id="logoutBtn">退出 🚪</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="sectionTitle">概览</h1>
+            <p class="muted">NovelAI Key 池 · 速率随可用 Key 自动调整</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn ghost" id="refreshBtn">刷新 🔄</button>
+            <button class="btn primary" id="openAuthBtn">登录 🔐</button>
+          </div>
+        </header>
+
+        <section class="section active" id="section-dashboard">
+          <div class="grid two">
+            <div class="card">
+              <h3>账户 👤</h3>
+              <div class="stat">
+                <span class="label">用户</span>
+                <span class="value" id="statUser">-</span>
+              </div>
+              <div class="stat">
+                <span class="label">角色</span>
+                <span class="value" id="statRole">-</span>
+              </div>
+              <div class="stat">
+                <span class="label">手动速率</span>
+                <span class="value" id="statManualRpm">-</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3>配额 ⏱️</h3>
+              <div class="stat">
+                <span class="label">自动配额</span>
+                <span class="value" id="statAutoQuota">-</span>
+              </div>
+              <div class="stat">
+                <span class="label">基础 RPM</span>
+                <span class="value" id="statBaseRpm">-</span>
+              </div>
+              <div class="stat">
+                <span class="label">每 Key RPM</span>
+                <span class="value" id="statPerKeyRpm">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="card wide" id="poolCard">
+            <div class="card-header">
+              <h3 id="poolTitle">共享池概况 🧺</h3>
+              <span class="tag" id="keySummary">-</span>
+            </div>
+            <div class="key-list" id="keyListPreview"></div>
+          </div>
+          <div class="card wide">
+            <div class="card-header">
+              <h3>模型广场 🧩</h3>
+              <button class="btn ghost" id="refreshModelsBtn">刷新 🔄</button>
+            </div>
+            <div class="key-list" id="modelList"></div>
+          </div>
+        </section>
+
+        <!-- 生图网页端已移除：本站仅提供 API 中转 -->
+
+        <section class="section" id="section-keys">
+          <div class="grid two">
+            <div class="card">
+              <h3>中转 API Key 🛰️</h3>
+              <div class="muted">
+                这是给你的客户端/脚本调用本站中转 API 用的密钥（不会显示你的 NovelAI Key）。
+              </div>
+              <div class="form" style="margin-top: 14px">
+                <label>
+                  备注
+                  <input type="text" id="clientKeyName" placeholder="例如：电脑 / 手机 / 脚本" />
+                </label>
+                <label class="inline">
+                  <input type="checkbox" id="clientKeyRotate" checked />
+                  生成时自动禁用旧 Key
+                </label>
+                <button class="btn primary" id="createClientKeyBtn" type="button">生成新的 API Key ➕</button>
+              </div>
+              <div class="card" style="margin-top: 14px; padding: 14px">
+                <div class="muted">仅显示一次，请妥善保存：</div>
+                <div class="key-chip" id="newClientKey">-</div>
+                <div class="muted" style="margin-top: 10px">
+                  APIURL：<code>http(s)://你的域名或IP:5002/v1/novelai</code><br />
+                  Header：<code>Authorization: Bearer np-xxxx</code>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>我的中转 Key 列表 🗝️</h3>
+              <div class="table" id="clientKeysTable"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="section-admin">
+          <div class="grid two">
+            <div class="card">
+              <h3>系统配置 ⚙️</h3>
+              <div class="form">
+                <label>
+                  配额模式
+                  <select id="quotaMode">
+                    <option value="auto">自动（按池健康 Key 数）</option>
+                    <option value="manual">手动（按用户单独设置）</option>
+                  </select>
+                </label>
+                <div class="muted" id="autoHint">
+                  自动模式：RPM = 基础RPM + 健康 Key 数 × 每Key RPM，并且不超过最大RPM。<br />
+                  健康 Key 数取自全站 Key 池（由管理员维护）。
+                </div>
+                <label>
+                  手动模式全局 RPM（未单独设置用户时使用）
+                  <input type="number" min="0" id="manualGlobalRpmInput" placeholder="0" />
+                </label>
+                <div class="grid two" style="margin-top: 10px">
+                  <label>
+                    基础 RPM（保底）
+                    <input type="number" min="0" id="baseRpmInput" placeholder="0" />
+                  </label>
+                  <label>
+                    每 Key RPM（健康Key）
+                    <input type="number" min="0" id="perKeyRpmInput" placeholder="10" />
+                  </label>
+                </div>
+                <div class="grid two">
+                  <label>
+                    最大 RPM（封顶）
+                    <input type="number" min="0" id="maxRpmInput" placeholder="120" />
+                  </label>
+                  <label>
+                    单 Key 冷却（秒）
+                    <input type="number" min="0" id="keyCooldownInput" placeholder="3" />
+                  </label>
+                </div>
+                <button class="btn primary" type="button" id="saveCommonConfigBtn">保存常用配置 💾</button>
+
+                <label class="inline" style="margin-top: 10px">
+                  <input type="checkbox" id="allowRegistrationToggle" />
+                  允许注册
+                </label>
+              </div>
+
+              <details style="margin-top: 14px">
+                <summary class="muted">高级配置（直接写 key/value）</summary>
+                <form id="configForm" class="form" style="margin-top: 12px">
+                  <label>
+                    配置项（key）
+                    <input type="text" name="key" placeholder="auto_quota_enabled / per_key_rpm / novelai_models ..." />
+                  </label>
+                  <label>
+                    数值（value）
+                    <input type="text" name="value" placeholder="true / 10 / 300" />
+                  </label>
+                  <button class="btn ghost" type="submit">提交 key/value 🧷</button>
+                </form>
+              </details>
+              <button class="btn ghost" id="healthCheckBtn">立即检测 🩺</button>
+            </div>
+            <div class="card">
+              <h3>管理数据 🗂️</h3>
+              <div class="admin-panels">
+                <div>
+                  <h4>用户 👥</h4>
+                  <div class="table" id="adminUsers"></div>
+                </div>
+                <div>
+                  <h4>密钥 🔐</h4>
+                  <form id="adminKeyUploadForm" class="form" style="margin-bottom: 12px">
+                    <label>
+                      上传到 Key 池（每行一个，可用逗号分隔）
+                      <textarea
+                        name="api_keys"
+                        rows="3"
+                        placeholder="粘贴 NovelAI Key（仅管理员可上传）"
+                      ></textarea>
+                    </label>
+                    <label class="inline">
+                      <input type="checkbox" name="verify_now" checked />
+                      立即验证
+                    </label>
+                    <button class="btn primary" type="submit">上传到池 ⬆️</button>
+                  </form>
+                  <div class="table" id="adminKeys"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card wide" style="margin-top: 20px">
+            <div class="card-header">
+              <h3>上游代理池 🌐</h3>
+              <button class="btn ghost" id="refreshProxyPoolBtn">刷新 🔄</button>
+            </div>
+            <div class="muted">
+              用于线路容灾/保活（非规避限流）。建议默认关闭，只有在你确实有自有代理线路时启用。
+            </div>
+            <div class="form" style="margin-top: 14px">
+              <label>
+                代理模式
+                <select id="upstreamProxyMode">
+                  <option value="direct">关闭（直连）</option>
+                  <option value="proxy_pool">开启（代理池）</option>
+                </select>
+              </label>
+
+              <label>
+                代理列表（每行一个或用逗号分隔）
+                <textarea id="upstreamProxies" rows="4" placeholder="http://user:pass@host:port&#10;socks5://user:pass@host:port"></textarea>
+                <div class="muted" id="upstreamProxiesHint">-</div>
+              </label>
+
+              <div class="grid two">
+                <label>
+                  代理冷却起步（秒）
+                  <input type="number" min="0" id="upstreamProxyCooldown" placeholder="10" />
+                </label>
+                <label>
+                  代理冷却上限（秒）
+                  <input type="number" min="0" id="upstreamProxyMaxCooldown" placeholder="120" />
+                </label>
+              </div>
+
+              <div class="grid two">
+                <label>
+                  切换阈值（连续失败次数）
+                  <input type="number" min="1" id="upstreamProxyFailureThreshold" placeholder="1" />
+                </label>
+                <label>
+                  失败计数上限
+                  <input type="number" min="1" id="upstreamProxyFailStreakCap" placeholder="6" />
+                </label>
+              </div>
+
+              <div class="grid two">
+                <label class="inline" style="margin-top: 24px">
+                  <input type="checkbox" id="upstreamProxyHandle429" />
+                  将 429 视为线路异常（更敏感）
+                </label>
+                <label class="inline" style="margin-top: 24px">
+                  <input type="checkbox" id="upstreamProxyHandle5xx" />
+                  将 5xx 视为线路异常（更敏感）
+                </label>
+              </div>
+              <label class="inline">
+                <input type="checkbox" id="upstreamProxyHandleNetworkErrors" />
+                将超时/连接错误视为线路异常（建议开启）
+              </label>
+
+              <div class="grid two">
+                <label>
+                  429 冷却起步（秒）
+                  <input type="number" min="0" id="upstreamProxyCooldown429" placeholder="10" />
+                </label>
+                <label>
+                  5xx 冷却起步（秒）
+                  <input type="number" min="0" id="upstreamProxyCooldown5xx" placeholder="15" />
+                </label>
+              </div>
+              <label>
+                超时/连接错误 冷却起步（秒）
+                <input type="number" min="0" id="upstreamProxyCooldownError" placeholder="10" />
+              </label>
+
+              <div class="grid two">
+                <label>
+                  粘性分流盐（可选）
+                  <input type="text" id="upstreamProxyStickySalt" placeholder="留空也可以" />
+                </label>
+                <label class="inline" style="margin-top: 24px">
+                  <input type="checkbox" id="upstreamProxyKeepaliveEnabled" />
+                  定时探活/保活（仅用于检测线路可用性）
+                </label>
+              </div>
+
+              <div class="grid two">
+                <label>
+                  探活间隔（秒）
+                  <input type="number" min="10" id="upstreamProxyKeepaliveInterval" placeholder="300" />
+                </label>
+                <label>
+                  探活 URL
+                  <input type="text" id="upstreamProxyKeepaliveUrl" placeholder="https://api.novelai.net/" />
+                </label>
+              </div>
+
+              <button class="btn primary" type="button" id="saveProxyPoolBtn">保存代理配置 💾</button>
+            </div>
+
+            <div class="log-table" style="margin-top: 16px">
+              <div class="log-head" id="proxyPoolHead"></div>
+              <div class="log-body" id="proxyPoolBody"></div>
+            </div>
+
+            <div class="divider"></div>
+            <h4 style="margin: 0">多机设置 🧩</h4>
+            <div class="muted">
+              多机总开关：<span id="multiNodeEnabledBadge" class="badge muted">-</span>
+              （需要所有节点环境变量 <code>MULTI_NODE_ENABLED=true</code>）<br />
+              多机共享数据库时建议开启“Leader-only”，避免每个节点都跑定时任务导致重复探测。当前节点：<span
+                id="adminNodeId"
+                class="badge muted"
+                >-</span
+              >
+            </div>
+            <div class="form" style="margin-top: 12px">
+              <label class="inline">
+                <input type="checkbox" id="healthCheckLeaderOnlyToggle" />
+                Key 健康检测仅 Leader 节点执行
+              </label>
+              <label>
+                健康检测 Leader NODE_ID
+                <input type="text" id="healthCheckLeaderNodeIdInput" placeholder="node-1" />
+              </label>
+              <label class="inline">
+                <input type="checkbox" id="proxyKeepaliveLeaderOnlyToggle" />
+                代理探活仅 Leader 节点执行
+              </label>
+              <label>
+                代理探活 Leader NODE_ID
+                <input type="text" id="proxyKeepaliveLeaderNodeIdInput" placeholder="node-1" />
+              </label>
+              <div class="muted">
+                提示：切换 Leader 后，可能需要等待几秒让节点同步配置；若仍不生效，重启对应节点即可。
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="section-logs">
+          <div class="card wide">
+            <div class="card-header">
+              <h3>使用日志 🧾</h3>
+              <div class="topbar-actions">
+                <button class="btn ghost" id="refreshMyLogsBtn">刷新 🔄</button>
+              </div>
+            </div>
+
+            <div class="log-toolbar">
+              <div class="log-filters">
+                <label class="log-filter">
+                  开始时间
+                  <input type="datetime-local" id="logFrom" />
+                </label>
+                <label class="log-filter">
+                  结束时间
+                  <input type="datetime-local" id="logTo" />
+                </label>
+                <label class="log-filter grow">
+                  关键词
+                  <input type="text" id="logQuery" placeholder="状态码 / 原因 / 用户名(管理员)..." />
+                </label>
+                <button class="btn ghost" id="applyLogFilterBtn">查询 🔎</button>
+                <button class="btn ghost" id="resetLogFilterBtn">重置 ♻️</button>
+              </div>
+
+              <div class="log-tabs" id="logTabs">
+                <button class="tab-btn active" data-log-tab="mine">我的 👤</button>
+                <button class="tab-btn" data-log-tab="all" id="adminLogTabBtn">全站 🌐</button>
+                <button class="btn ghost" id="refreshAdminLogsBtn">刷新全站 🔄</button>
+              </div>
+            </div>
+
+            <div class="log-table">
+              <div class="log-head" id="logHead"></div>
+              <div class="log-body" id="logBody"></div>
+            </div>
+
+            <div class="log-footer">
+              <div class="muted" id="logCountHint">-</div>
+              <div class="log-pager">
+                <button class="btn ghost" id="logPrevBtn">上一页 ⬅️</button>
+                <div class="muted" id="logPageInfo">-</div>
+                <button class="btn ghost" id="logNextBtn">下一页 ➡️</button>
+                <label class="log-page-size">
+                  每页 📄
+                  <select id="logPageSize">
+                    <option value="20">20</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="muted" style="margin-top: 10px">
+              仅记录通过本站中转接口发起的请求。默认不展示 IP；管理员可在“系统配置”中开启记录与显示。
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal" id="authModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>登录 🔐</h3>
+          <button class="btn ghost" id="closeAuthBtn">关闭</button>
+        </div>
+        <form id="loginForm" class="form">
+          <label>
+            用户名
+            <input type="text" name="username" required />
+          </label>
+          <label>
+            密码
+            <input type="password" name="password" required />
+          </label>
+          <button class="btn primary" type="submit">登录 🔐</button>
+        </form>
+        <div class="divider"></div>
+        <form id="registerForm" class="form">
+          <label>
+            用户名
+            <input type="text" name="username" required />
+          </label>
+          <label>
+            邮箱
+            <input type="email" name="email" />
+          </label>
+          <label>
+            密码
+            <input type="password" name="password" required />
+          </label>
+          <label>
+            确认密码
+            <input type="password" name="confirm_password" required />
+          </label>
+          <button class="btn ghost" type="submit">注册 ✨</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

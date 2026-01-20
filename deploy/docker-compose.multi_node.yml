@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: novelai_pool
+      POSTGRES_USER: novelai
+      POSTGRES_PASSWORD: novelai
+    volumes:
+      - novelai_pool_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novelai -d novelai_pool"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  node1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      # For a quick local demo this is set to dev (no strict secret validation).
+      # For real deployments, set ENVIRONMENT=prod and replace SECRET_KEY / ADMIN_PASSWORD / ENCRYPTION_KEY.
+      ENVIRONMENT: dev
+      NODE_ID: node-1
+      MULTI_NODE_ENABLED: "true"
+      DATABASE_URL: postgresql+asyncpg://novelai:novelai@postgres:5432/novelai_pool
+      SECRET_KEY: change-me
+      ENCRYPTION_KEY: replace-with-generated-key
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: change-me
+      ADMIN_FORCE_RESET: "false"
+      HEALTH_CHECK_ENABLED: "true"
+      HEALTH_CHECK_LEADER_ONLY: "true"
+      HEALTH_CHECK_LEADER_NODE_ID: node-1
+      UPSTREAM_PROXY_KEEPALIVE_ENABLED: "false"
+      UPSTREAM_PROXY_KEEPALIVE_LEADER_ONLY: "true"
+      UPSTREAM_PROXY_KEEPALIVE_LEADER_NODE_ID: node-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  node2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: dev
+      NODE_ID: node-2
+      MULTI_NODE_ENABLED: "true"
+      DATABASE_URL: postgresql+asyncpg://novelai:novelai@postgres:5432/novelai_pool
+      SECRET_KEY: change-me
+      ENCRYPTION_KEY: replace-with-generated-key
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: change-me
+      ADMIN_FORCE_RESET: "false"
+      HEALTH_CHECK_ENABLED: "true"
+      HEALTH_CHECK_LEADER_ONLY: "true"
+      HEALTH_CHECK_LEADER_NODE_ID: node-1
+      UPSTREAM_PROXY_KEEPALIVE_ENABLED: "false"
+      UPSTREAM_PROXY_KEEPALIVE_LEADER_ONLY: "true"
+      UPSTREAM_PROXY_KEEPALIVE_LEADER_NODE_ID: node-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.docker.multi_node.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - node1
+      - node2
+
+volumes:
+  novelai_pool_pgdata:
